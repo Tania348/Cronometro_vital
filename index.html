@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html class="dark" lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="theme-color" content="#0A0908"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <title>Cronómetro Vital • Guía de Código Azul</title>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet"/>
+  
+  <!-- Material Symbols Outlined -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            background: "#0A0908",
+            surface: "#141210",
+            "surface-low": "#181614",
+            "surface-card": "#1E1B18",
+            "surface-high": "#282421",
+            "surface-border": "#36322E",
+            "on-surface": "#F5EFEB",
+            "on-surface-variant": "#B8AEA8",
+            "primary": "#EF4444",           // Código / Shock / Emergencia (Rojo vivo)
+            "primary-container": "#7F1D1D",
+            "secondary": "#F59E0B",         // Ciclo RCP / Alerta (Ámbar)
+            "secondary-container": "#78350F",
+            "tertiary": "#06B6D4",          // Fármacos / Adrenalina (Cian)
+            "tertiary-container": "#083344",
+            "success": "#10B981",           // Éxito / RCE / Estable (Verde)
+            "success-container": "#064E3B",
+          },
+          fontFamily: {
+            sans: ["Inter", "sans-serif"],
+            mono: ["JetBrains Mono", "monospace"],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Reglas para interfaz móvil clínica */
+    * {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    input, textarea {
+      user-select: text;
+    }
+    body {
+      background-color: #0A0908;
+      color: #F5EFEB;
+      overscroll-behavior-y: none;
+      font-family: 'Inter', sans-serif;
+    }
+    .font-mono-timer {
+      font-family: 'JetBrains Mono', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    /* Animación del metrónomo visual silencioso */
+    @keyframes silentPulse {
+      0% { transform: scale(0.95); opacity: 0.3; }
+      50% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.3; }
+    }
+    .animate-metronome {
+      animation: silentPulse 0.545s infinite ease-in-out; /* ~110 CPM */
+    }
+    /* Scrollbar oculta */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-background text-on-surface antialiased pb-20 lg:pb-6">
+
+  <!-- ==================== HEADER SUPERIOR ==================== -->
+  <header class="sticky top-0 z-50 bg-surface/95 backdrop-blur border-b border-surface-border px-3 sm:px-6 py-2.5">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-2">
+      <!-- Marca y Estado -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-primary/20 border border-primary/40 flex items-center justify-center text-primary">
+          <span class="material-symbols-outlined text-[24px]">cardiology</span>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-sm sm:text-base font-bold font-mono tracking-wider text-on-surface uppercase">CRONÓMETRO VITAL</h1>
+            <span id="badge-code-state" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider bg-primary/20 text-primary border border-primary/40 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-primary animate-ping"></span>
+              ACTIVO
+            </span>
+          </div>
+          <p class="text-[11px] text-on-surface-variant font-medium hidden sm:block">Asistente Inteligente de Código Azul • ACLS</p>
+        </div>
+      </div>
+
+      <!-- Navegación de Pestañas (Desktop / Tablet) -->
+      <nav class="hidden md:flex items-center bg-surface-card p-1 rounded-xl border border-surface-border">
+        <button id="nav-btn-console" onclick="switchTab('console')" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 bg-surface-high text-primary border border-surface-border">
+          <span class="material-symbols-outlined text-[18px]">timer</span>
+          <span>Consola en Vivo</span>
+        </button>
+        <button id="nav-btn-timeline" onclick="switchTab('timeline')" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-on-surface-variant hover:text-on-surface">
+          <span class="material-symbols-outlined text-[18px]">receipt_long</span>
+          <span>Bitácora y Eventos</span>
+        </button>
+        <button id="nav-btn-drugs" onclick="switchTab('drugs')" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-on-surface-variant hover:text-on-surface">
+          <span class="material-symbols-outlined text-[18px]">medication</span>
+          <span>Filtro de Dosis</span>
+        </button>
+      </nav>
+
+      <!-- Botones de Control de Sesión (Iniciar / Pausar / Reiniciar) -->
+      <div class="flex items-center gap-1.5 sm:gap-2">
+        <button id="btn-toggle-timer" onclick="toggleTimer()" class="h-9 px-3 sm:px-4 rounded-lg bg-surface-card border border-surface-border text-on-surface hover:bg-surface-high text-xs font-mono font-bold flex items-center gap-1.5 active:scale-95 transition-transform" title="Iniciar o Pausar">
+          <span id="icon-toggle-timer" class="material-symbols-outlined text-[18px] text-secondary">pause</span>
+          <span id="lbl-toggle-timer" class="hidden sm:inline">Pausar</span>
+        </button>
+        <button onclick="confirmReset()" class="h-9 px-2.5 sm:px-3 rounded-lg bg-surface-card border border-surface-border text-on-surface-variant hover:text-primary hover:border-primary/40 text-xs font-mono flex items-center gap-1 active:scale-95 transition-transform" title="Nuevo Código / Reiniciar">
+          <span class="material-symbols-outlined text-[18px]">restart_alt</span>
+          <span class="hidden sm:inline">Nuevo</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== TIRA DE CADENCIA: METRÓNOMO SILENCIOSO ==================== -->
+  <div class="bg-surface-low border-b border-surface-border/60 px-3 sm:px-6 py-1.5">
+    <div class="max-w-7xl mx-auto flex items-center justify-between text-xs font-mono">
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-secondary animate-metronome"></span>
+        <span class="text-secondary font-bold tracking-wide">METRÓNOMO VISUAL SILENCIOSO: 110 CPM</span>
+        <span class="text-on-surface-variant hidden md:inline">• Cadencia recomendada de compresiones torácicas</span>
+      </div>
+      <div class="flex items-center gap-2 text-on-surface-variant">
+        <span class="inline-flex items-center gap-1 text-tertiary">
+          <span class="material-symbols-outlined text-[15px]">volume_off</span>
+          100% Silencioso
+        </span>
+        <span class="hidden sm:inline">• Sin datos de paciente</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== CONTENIDO PRINCIPAL ==================== -->
+  <main class="max-w-7xl mx-auto w-full px-3 sm:px-6 py-4 flex-1 flex flex-col gap-4">
+
+    <!-- ==================== VISTA 1: CONSOLA EN VIVO ==================== -->
+    <section id="view-console" class="tab-view flex flex-col gap-4">
+
+      <!-- BENTO PRINCIPAL: RELOJ MAESTRO + CICLO RCP DE 2 MIN -->
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4">
+        
+        <!-- TARJETA 1: CRONÓMETRO MAESTRO (TIEMPO TOTAL) -->
+        <div class="md:col-span-5 bg-surface-card rounded-2xl p-4 sm:p-5 border border-surface-border flex flex-col justify-between relative overflow-hidden shadow-xl">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-mono text-on-surface-variant uppercase tracking-wider flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-primary text-[18px]">timelapse</span>
+              TIEMPO TOTAL TRANSCURRIDO
+            </span>
+            <span id="badge-master-status" class="text-[11px] font-mono px-2 py-0.5 rounded bg-surface-high text-primary font-bold border border-primary/20">
+              EN CURSO
+            </span>
+          </div>
+
+          <div class="my-3 flex items-baseline gap-2">
+            <span id="display-master" class="font-mono-timer text-5xl sm:text-6xl lg:text-7xl font-extrabold text-on-surface tracking-tight">
+              00:00
+            </span>
+            <span class="text-xs font-mono text-primary font-bold animate-pulse">REC</span>
+          </div>
+
+          <div class="pt-2 border-t border-surface-border/60 flex items-center justify-between text-xs font-mono text-on-surface-variant">
+            <span>INICIO T0: <span id="time-started" class="text-on-surface font-semibold">--:--</span></span>
+            <span class="text-tertiary">ACLS EN VIVO</span>
+          </div>
+        </div>
+
+        <!-- TARJETA 2: CICLO RCP (2 MINUTOS CON ALERTA DE COLOR) -->
+        <div id="card-cpr-cycle" class="md:col-span-7 bg-surface-card rounded-2xl p-4 sm:p-5 border-2 border-secondary/40 flex flex-col justify-between relative overflow-hidden shadow-xl transition-colors duration-500">
+          
+          <!-- Banner de Estado de Ciclo -->
+          <div class="flex items-center justify-between relative z-10">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-secondary text-[22px]">sync</span>
+              <span id="lbl-cpr-cycle" class="text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-secondary">
+                CICLO RCP ACTUAL: #1
+              </span>
+            </div>
+            <div id="badge-cycle-alert" class="px-2 py-0.5 rounded text-[11px] font-mono font-bold tracking-wider bg-secondary/20 text-secondary border border-secondary/30 flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-secondary"></span>
+              <span id="text-cycle-alert">COMPRESIONES EN CURSO</span>
+            </div>
+          </div>
+
+          <!-- Reloj de Ciclo + Indicador Visual de Anillo -->
+          <div class="my-3 flex items-center justify-between gap-4 relative z-10">
+            <div>
+              <div class="flex items-baseline gap-2">
+                <span id="display-cycle" class="font-mono-timer text-5xl sm:text-6xl font-extrabold text-secondary tracking-tight">
+                  02:00
+                </span>
+                <span class="text-xs sm:text-sm font-mono text-on-surface-variant font-medium">/ 02:00</span>
+              </div>
+              <p id="cycle-instruction" class="text-xs sm:text-sm font-mono text-on-surface-variant mt-1">
+                Mantener 100-120 CPM • Minimizar interrupciones
+              </p>
+            </div>
+
+            <!-- Gráfico Circular SVG -->
+            <div class="shrink-0 relative w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center">
+              <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                <path class="text-surface-high" stroke="currentColor" stroke-width="3.5" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                <path id="circle-cycle-progress" class="text-secondary transition-all duration-1000 ease-linear" stroke="currentColor" stroke-width="3.5" stroke-dasharray="100, 100" stroke-linecap="round" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+              </svg>
+              <div class="absolute flex flex-col items-center justify-center text-center">
+                <span id="display-cycle-seconds" class="text-xs sm:text-sm font-mono font-bold text-on-surface">120s</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- BOTÓN EXTRA GRANDE: MARCAR CICLO RCP COMPLETADO -->
+          <button id="btn-cycle-reset" onclick="completeCycle()" class="w-full min-h-[58px] sm:h-16 bg-secondary text-background hover:brightness-110 active:scale-[0.98] transition-all rounded-xl font-mono text-xs sm:text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg cursor-pointer relative z-10">
+            <span class="material-symbols-outlined text-[26px]">restart_alt</span>
+            <span>MARCAR CICLO COMPLETADO (REINICIAR 2 MIN)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- RESUMEN EN VIVO: CONTADORES RÁPIDOS -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <!-- Shocks -->
+        <div class="bg-surface-card rounded-xl p-3 border border-surface-border flex items-center justify-between">
+          <div>
+            <span class="text-[10px] sm:text-xs font-mono text-on-surface-variant block uppercase">SHOCKS / DESCARGAS</span>
+            <span id="counter-shocks" class="text-xl sm:text-2xl font-mono font-bold text-primary">0</span>
+          </div>
+          <span class="material-symbols-outlined text-primary text-[28px] opacity-80">electric_bolt</span>
+        </div>
+
+        <!-- Adrenalina -->
+        <div class="bg-surface-card rounded-xl p-3 border border-surface-border flex items-center justify-between">
+          <div>
+            <span class="text-[10px] sm:text-xs font-mono text-on-surface-variant block uppercase">ADRENALINA (1mg)</span>
+            <span id="counter-adrenalina" class="text-xl sm:text-2xl font-mono font-bold text-tertiary">0 mg</span>
+          </div>
+          <span class="material-symbols-outlined text-tertiary text-[28px] opacity-80">medication</span>
+        </div>
+
+        <!-- Ventana Última Adrenalina -->
+        <div class="bg-surface-card rounded-xl p-3 border border-surface-border flex items-center justify-between">
+          <div>
+            <span class="text-[10px] sm:text-xs font-mono text-on-surface-variant block uppercase">ÚLTIMA ADRENALINA</span>
+            <span id="text-adrenalina-ago" class="text-xs sm:text-sm font-mono font-bold text-on-surface">Sin dosis</span>
+          </div>
+          <span class="material-symbols-outlined text-secondary text-[24px] opacity-80">hourglass_top</span>
+        </div>
+
+        <!-- Ciclos Totales -->
+        <div class="bg-surface-card rounded-xl p-3 border border-surface-border flex items-center justify-between">
+          <div>
+            <span class="text-[10px] sm:text-xs font-mono text-on-surface-variant block uppercase">CICLOS EVALUADOS</span>
+            <span id="counter-cycles-done" class="text-xl sm:text-2xl font-mono font-bold text-success">0</span>
+          </div>
+          <span class="material-symbols-outlined text-success text-[28px] opacity-80">verified</span>
+        </div>
+      </div>
+
+      <!-- MATRIZ DE ACCIÓN INMEDIATA TÁCTIL (BOTONES EXTRA GRANDES SIN TECLEAR) -->
+      <div class="flex flex-col gap-2.5">
+        <div class="flex items-center justify-between pt-1">
+          <span class="text-xs font-mono font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-primary text-[18px]">touch_app</span>
+            ANOTAR ACCIONES INMEDIATAS (UN TOQUE • SIN TECLEAR)
+          </span>
+          <span class="text-[11px] font-mono text-tertiary hidden sm:inline">Registro instantáneo al segundo</span>
+        </div>
+
+        <!-- FILA 1: SHOCK Y ADRENALINA (ACCIONES CRÍTICAS) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <!-- Botón Desfibrilación / Shock -->
+          <button onclick="registerEvent('Desfibrilación 200J Bifásico', 'Descarga aplicada sin interrupción de RCP', 'bolt', 'primary')" class="min-h-[74px] bg-primary text-white hover:brightness-110 active:scale-[0.98] transition-all rounded-xl p-3.5 flex items-center justify-between shadow-lg cursor-pointer">
+            <div class="flex items-center gap-3 text-left">
+              <div class="w-12 h-12 rounded-lg bg-black/30 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[32px] text-white">offline_bolt</span>
+              </div>
+              <div>
+                <span class="text-sm sm:text-base font-black font-mono tracking-tight block">DESFIBRILACIÓN / SHOCK</span>
+                <span class="text-xs font-mono opacity-90 block">Descarga 200J Bifásica</span>
+              </div>
+            </div>
+            <span class="text-xs font-mono font-bold px-3 py-1.5 rounded bg-black/30">REGISTRAR</span>
+          </button>
+
+          <!-- Botón Adrenalina 1mg -->
+          <button onclick="registerAdrenalina()" class="min-h-[74px] bg-tertiary text-background hover:brightness-110 active:scale-[0.98] transition-all rounded-xl p-3.5 flex items-center justify-between shadow-lg cursor-pointer">
+            <div class="flex items-center gap-3 text-left">
+              <div class="w-12 h-12 rounded-lg bg-black/20 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[32px] text-background">vaccines</span>
+              </div>
+              <div>
+                <span class="text-sm sm:text-base font-black font-mono tracking-tight block">ADRENALINA 1 mg I.V./I.O.</span>
+                <span class="text-xs font-mono opacity-90 block">Bolo + 20ml SF • Ventana 3-5m</span>
+              </div>
+            </div>
+            <span class="text-xs font-mono font-bold px-3 py-1.5 rounded bg-black/20">+1 MG</span>
+          </button>
+        </div>
+
+        <!-- FILA 2: AMIODARONA (DOSIS 1 Y 2) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <!-- Amiodarona Dosis 1 (300mg) -->
+          <button onclick="registerEvent('Amiodarona 300mg I.V. (1ra Dosis)', 'Bolo rápido para FV/TVSP refractaria', 'pill', 'secondary')" class="min-h-[64px] bg-surface-card hover:bg-surface-high border border-surface-border text-on-surface rounded-xl px-4 flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer">
+            <div class="flex items-center gap-2.5 text-left">
+              <span class="material-symbols-outlined text-secondary text-[26px]">medication_liquid</span>
+              <div>
+                <span class="text-xs sm:text-sm font-bold font-mono block">AMIODARONA 300 mg</span>
+                <span class="text-[11px] font-mono text-on-surface-variant block">1ra Dosis (FV/TVSP persistente)</span>
+              </div>
+            </div>
+            <span class="text-[11px] font-mono font-bold px-2 py-1 rounded bg-secondary/20 text-secondary border border-secondary/30">DOSIS 1</span>
+          </button>
+
+          <!-- Amiodarona Dosis 2 (150mg) -->
+          <button onclick="registerEvent('Amiodarona 150mg I.V. (2da Dosis)', 'Bolo de mantenimiento posterior a 5to ciclo', 'pill', 'secondary')" class="min-h-[64px] bg-surface-card hover:bg-surface-high border border-surface-border text-on-surface rounded-xl px-4 flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer">
+            <div class="flex items-center gap-2.5 text-left">
+              <span class="material-symbols-outlined text-secondary text-[26px]">medication_liquid</span>
+              <div>
+                <span class="text-xs sm:text-sm font-bold font-mono block">AMIODARONA 150 mg</span>
+                <span class="text-[11px] font-mono text-on-surface-variant block">2da Dosis (Refractaria)</span>
+              </div>
+            </div>
+            <span class="text-[11px] font-mono font-bold px-2 py-1 rounded bg-secondary/20 text-secondary border border-secondary/30">DOSIS 2</span>
+          </button>
+        </div>
+
+        <!-- FILA 3: EVALUACIÓN DE RITMO CARDIACO -->
+        <div class="bg-surface-card border border-surface-border p-3.5 rounded-xl flex flex-col gap-2">
+          <span class="text-xs font-mono uppercase tracking-wider text-on-surface-variant font-semibold">
+            EVALUACIÓN DE RITMO CARDÍACO (UN CLIC)
+          </span>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <button onclick="registerEvent('Ritmo: FV / TVSP (Desfibrilable)', 'Ritmo shockable confirmado. Cargar desfibrilador.', 'electric_bolt', 'primary')" class="h-14 bg-surface-high hover:bg-primary/20 hover:border-primary/50 border border-surface-border rounded-lg p-2 flex flex-col justify-center items-center active:scale-[0.98] transition-all cursor-pointer">
+              <span class="text-xs sm:text-sm font-bold font-mono text-primary">FV / TVSP</span>
+              <span class="text-[10px] font-mono text-on-surface-variant">DESFIBRILABLE</span>
+            </button>
+
+            <button onclick="registerEvent('Ritmo: Asistolia / AESP (No Desfibrilable)', 'Continuar compresiones 2 min + Adrenalina inmediata.', 'monitor_heart', 'tertiary')" class="h-14 bg-surface-high hover:bg-tertiary/20 hover:border-tertiary/50 border border-surface-border rounded-lg p-2 flex flex-col justify-center items-center active:scale-[0.98] transition-all cursor-pointer">
+              <span class="text-xs sm:text-sm font-bold font-mono text-tertiary">ASISTOLIA / AESP</span>
+              <span class="text-[10px] font-mono text-on-surface-variant">NO DESFIBRILABLE</span>
+            </button>
+
+            <button onclick="registerEvent('¡RCE CONFIRMADO (Retorno de Circulación)!', 'Pulso central palpable verificado. Iniciar posparo.', 'favorite', 'success')" class="h-14 bg-success text-background hover:brightness-110 rounded-lg p-2 flex flex-col justify-center items-center active:scale-[0.98] transition-all shadow-md cursor-pointer">
+              <span class="text-xs sm:text-sm font-black font-mono uppercase">¡RCE DETECTADO!</span>
+              <span class="text-[10px] font-mono uppercase font-bold opacity-90">RETORNO CIRCULACIÓN</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- FILA 4: PROCEDIMIENTOS ADICIONALES -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <button onclick="registerEvent('Vía Aérea Avanzada Asegurada', 'Tubo endotraqueal / supraglótico con capnografía activa', 'air', 'tertiary')" class="h-14 bg-surface-card hover:bg-surface-high border border-surface-border rounded-lg px-3 flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer">
+            <div class="flex items-center gap-2 text-left">
+              <span class="material-symbols-outlined text-tertiary text-[22px]">air</span>
+              <div>
+                <span class="text-xs font-mono font-bold block">VÍA AÉREA AVANZADA</span>
+                <span class="text-[10px] font-mono text-on-surface-variant block">Tubo ET / Supraglótico</span>
+              </div>
+            </div>
+            <span class="material-symbols-outlined text-on-surface-variant text-[18px]">add_circle</span>
+          </button>
+
+          <button onclick="registerEvent('Acceso Vascular Establecido', 'Vía periférica / Vía Intraósea permeable comprobada', 'colorize', 'tertiary')" class="h-14 bg-surface-card hover:bg-surface-high border border-surface-border rounded-lg px-3 flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer">
+            <div class="flex items-center gap-2 text-left">
+              <span class="material-symbols-outlined text-tertiary text-[22px]">colorize</span>
+              <div>
+                <span class="text-xs font-mono font-bold block">ACCESO VASCULAR</span>
+                <span class="text-[10px] font-mono text-on-surface-variant block">Periférico / Intraóseo</span>
+              </div>
+            </div>
+            <span class="material-symbols-outlined text-on-surface-variant text-[18px]">add_circle</span>
+          </button>
+
+          <button onclick="registerEvent('Bicarbonato / Otros Fármacos', 'Administrado según protocolo de causas reversibles (5H y 5T)', 'science', 'secondary')" class="h-14 bg-surface-card hover:bg-surface-high border border-surface-border rounded-lg px-3 flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer">
+            <div class="flex items-center gap-2 text-left">
+              <span class="material-symbols-outlined text-secondary text-[22px]">science</span>
+              <div>
+                <span class="text-xs font-mono font-bold block">BICARB / OTROS</span>
+                <span class="text-[10px] font-mono text-on-surface-variant block">5H y 5T reversibles</span>
+              </div>
+            </div>
+            <span class="material-symbols-outlined text-on-surface-variant text-[18px]">add_circle</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ÚLTIMOS EVENTOS REGISTRADOS (VISTA PREVIA EN VIVO) -->
+      <div class="bg-surface-card rounded-2xl p-4 border border-surface-border flex flex-col gap-2.5">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-mono font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-secondary text-[18px]">receipt_long</span>
+            LÍNEA DE TIEMPO RECIENTE
+          </span>
+          <button onclick="switchTab('timeline')" class="text-xs font-mono text-tertiary hover:underline flex items-center gap-1">
+            Ver bitácora completa <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+          </button>
+        </div>
+
+        <div id="preview-event-stream" class="flex flex-col gap-2 max-h-56 overflow-y-auto">
+          <!-- Los eventos dinámicos se insertan aquí -->
+          <div class="p-3 bg-surface-low rounded-lg text-center text-xs font-mono text-on-surface-variant">
+            Aún no hay eventos registrados en este Código Azul. Toca cualquier botón de acción para iniciar el registro.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== VISTA 2: LÍNEA DE TIEMPO Y BITÁCORA ==================== -->
+    <section id="view-timeline" class="tab-view hidden flex flex-col gap-4">
+      <div class="bg-surface-card rounded-2xl p-4 sm:p-5 border border-surface-border flex flex-col gap-4">
+        
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-surface-border">
+          <div>
+            <h2 class="text-base sm:text-lg font-bold font-mono text-on-surface flex items-center gap-2">
+              <span class="material-symbols-outlined text-secondary">history_edu</span>
+              Bitácora Cronológica Completa
+            </h2>
+            <p class="text-xs text-on-surface-variant font-mono mt-0.5">
+              Registro inmutable con minuto y segundo exacto de cada intervención
+            </p>
+          </div>
+
+          <!-- Botón Copiar Bitácora -->
+          <button onclick="copyAuditLog()" class="h-10 px-4 rounded-xl bg-surface-high hover:bg-surface-border border border-surface-border text-on-surface font-mono text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-transform">
+            <span class="material-symbols-outlined text-[18px] text-tertiary">content_copy</span>
+            <span id="lbl-copy-report">Copiar Reporte Clínico</span>
+          </button>
+        </div>
+
+        <!-- Filtros de categoría para la bitácora -->
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <button onclick="filterTimeline('all')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-mono font-semibold bg-surface-high text-primary border border-surface-border" data-filter="all">Todos</button>
+          <button onclick="filterTimeline('shock')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-mono font-semibold bg-surface-low text-on-surface-variant hover:text-on-surface" data-filter="shock">Shocks</button>
+          <button onclick="filterTimeline('drug')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-mono font-semibold bg-surface-low text-on-surface-variant hover:text-on-surface" data-filter="drug">Fármacos</button>
+          <button onclick="filterTimeline('cycle')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-mono font-semibold bg-surface-low text-on-surface-variant hover:text-on-surface" data-filter="cycle">Ciclos RCP</button>
+          <button onclick="filterTimeline('rhythm')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-mono font-semibold bg-surface-low text-on-surface-variant hover:text-on-surface" data-filter="rhythm">Ritmos</button>
+        </div>
+
+        <!-- Contenedor del listado completo -->
+        <div id="full-event-stream" class="flex flex-col gap-2 min-h-[300px]">
+          <!-- Se llena dinámicamente con JavaScript -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== VISTA 3: FILTRO RÁPIDO DE MEDICAMENTOS ==================== -->
+    <section id="view-drugs" class="tab-view hidden flex flex-col gap-4">
+      
+      <!-- BANNER DE CONSULTA RÁPIDA: "¿CUÁNDO FUE LA ÚLTIMA DOSIS?" -->
+      <div class="flex flex-col gap-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-mono font-bold text-secondary uppercase tracking-wider flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-[20px]">contact_support</span>
+            CONSULTA INMEDIATA AL CRONOMETRISTA: ¿CUÁNDO FUE LA ÚLTIMA DOSIS?
+          </span>
+        </div>
+        <p class="text-xs font-mono text-on-surface-variant">
+          Respuestas listas para informar verbalmente al líder de la reanimación en 1 segundo.
+        </p>
+      </div>
+
+      <!-- TARJETAS DE DECISIÓN RÁPIDA -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+        
+        <!-- Tarjeta Adrenalina -->
+        <div class="bg-surface-card rounded-2xl p-4 sm:p-5 border border-surface-border flex flex-col justify-between shadow-xl">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs sm:text-sm font-bold font-mono text-tertiary flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[20px]">medication</span>
+                Adrenalina (1 mg)
+              </span>
+              <span id="badge-adrenalina-window" class="text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase bg-surface-high text-on-surface-variant">
+                SIN DOSIS
+              </span>
+            </div>
+            
+            <div class="my-2 flex items-baseline gap-2">
+              <span class="text-xs font-mono text-on-surface-variant">HACE:</span>
+              <span id="card-adrenalina-ago" class="font-mono-timer text-3xl sm:text-4xl font-extrabold text-tertiary">--:--</span>
+            </div>
+
+            <div class="p-2.5 bg-surface-low rounded-xl text-xs font-mono flex flex-col gap-1 text-on-surface-variant mt-2">
+              <div class="flex justify-between">
+                <span>Dosis acumulada:</span>
+                <span id="card-adrenalina-total" class="text-on-surface font-bold">0 mg</span>
+              </div>
+              <div class="flex justify-between">
+                <span>Ventana clínica:</span>
+                <span class="text-secondary font-semibold">Cada 3 a 5 min</span>
+              </div>
+              <div class="flex justify-between">
+                <span>Último registro:</span>
+                <span id="card-adrenalina-last" class="text-on-surface">Ninguno</span>
+              </div>
+            </div>
+          </div>
+
+          <button onclick="registerAdrenalina()" class="mt-4 w-full h-12 bg-tertiary text-background font-mono text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:scale-95 transition-all">
+            <span class="material-symbols-outlined text-[18px]">add_circle</span>
+            <span>REGISTRAR BOLO 1mg</span>
+          </button>
+        </div>
+
+        <!-- Tarjeta Amiodarona -->
+        <div class="bg-surface-card rounded-2xl p-4 sm:p-5 border border-surface-border flex flex-col justify-between shadow-xl">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs sm:text-sm font-bold font-mono text-secondary flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[20px]">pill</span>
+                Amiodarona
+              </span>
+              <span id="badge-amiodarona-status" class="text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase bg-surface-high text-on-surface-variant">
+                PENDIENTE
+              </span>
+            </div>
+            
+            <div class="my-2 flex items-baseline gap-2">
+              <span class="text-xs font-mono text-on-surface-variant">HACE:</span>
+              <span id="card-amiodarona-ago" class="font-mono-timer text-3xl sm:text-4xl font-extrabold text-secondary">--:--</span>
+            </div>
+
+            <div class="p-2.5 bg-surface-low rounded-xl text-xs font-mono flex flex-col gap-1 text-on-surface-variant mt-2">
+              <div class="flex justify-between">
+                <span>1ra Dosis (300mg):</span>
+                <span id="card-amio-1-time" class="text-on-surface font-semibold">No aplicada</span>
+              </div>
+              <div class="flex justify-between">
+                <span>2da Dosis (150mg):</span>
+                <span id="card-amio-2-time" class="text-on-surface font-semibold">No aplicada</span>
+              </div>
+              <div class="flex justify-between">
+                <span>Dosis acumulada:</span>
+                <span id="card-amiodarona-total" class="text-secondary font-bold">0 mg</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 grid grid-cols-2 gap-2">
+            <button onclick="registerEvent('Amiodarona 300mg I.V. (1ra Dosis)', '1ra Dosis en bolo rápido', 'pill', 'secondary')" class="h-12 bg-surface-high hover:bg-surface-border text-on-surface font-mono text-xs font-bold rounded-xl flex items-center justify-center gap-1 active:scale-95 transition-all">
+              <span>+300 mg</span>
+            </button>
+            <button onclick="registerEvent('Amiodarona 150mg I.V. (2da Dosis)', '2da Dosis de mantenimiento', 'pill', 'secondary')" class="h-12 bg-surface-high hover:bg-surface-border text-on-surface font-mono text-xs font-bold rounded-xl flex items-center justify-center gap-1 active:scale-95 transition-all">
+              <span>+150 mg</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tarjeta Desfibrilación -->
+        <div class="bg-surface-card rounded-2xl p-4 sm:p-5 border border-surface-border flex flex-col justify-between shadow-xl">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs sm:text-sm font-bold font-mono text-primary flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[20px]">bolt</span>
+                Desfibrilación
+              </span>
+              <span id="badge-shocks-status" class="text-[10px] font-mono px-2 py-0.5 rounded font-bold uppercase bg-surface-high text-on-surface-variant">
+                0 DESCARGAS
+              </span>
+            </div>
+            
+            <div class="my-2 flex items-baseline gap-2">
+              <span class="text-xs font-mono text-on-surface-variant">HACE:</span>
+              <span id="card-shocks-ago" class="font-mono-timer text-3xl sm:text-4xl font-extrabold text-primary">--:--</span>
+            </div>
+
+            <div class="p-2.5 bg-surface-low rounded-xl text-xs font-mono flex flex-col gap-1 text-on-surface-variant mt-2">
+              <div class="flex justify-between">
+                <span>Shocks totales:</span>
+                <span id="card-shocks-total" class="text-primary font-bold">0</span>
+              </div>
+              <div class="flex justify-between">
+                <span>Energía estándar:</span>
+                <span class="text-on-surface font-semibold">200 Joules</span>
+              </div>
+              <div class="flex justify-between">
+                <span>Último shock:</span>
+                <span id="card-shocks-last" class="text-on-surface">Ninguno</span>
+              </div>
+            </div>
+          </div>
+
+          <button onclick="registerEvent('Desfibrilación 200J Bifásico', 'Descarga eléctrica bifásica', 'bolt', 'primary')" class="mt-4 w-full h-12 bg-primary text-white font-mono text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 hover:brightness-110 active:scale-95 transition-all">
+            <span class="material-symbols-outlined text-[18px]">bolt</span>
+            <span>REGISTRAR SHOCK</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- BARRA DE BÚSQUEDA Y FILTRADO POR TEXTO -->
+      <div class="bg-surface-card rounded-2xl p-4 sm:p-5 border border-surface-border flex flex-col gap-3">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-tertiary">search</span>
+          <span class="text-xs font-mono font-bold text-on-surface uppercase">Buscar medicamento o intervención específica:</span>
+        </div>
+        
+        <div class="relative">
+          <input id="input-search-events" oninput="handleSearch(this.value)" type="text" placeholder="Escribe 'Adrenalina', 'Amiodarona', 'Shock', 'Vía Aérea'..." class="w-full h-12 bg-surface-low border border-surface-border rounded-xl px-4 text-sm font-mono text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:border-tertiary"/>
+          <button onclick="clearSearch()" class="absolute right-3 top-3 text-on-surface-variant hover:text-on-surface text-xs font-mono">
+            Limpiar
+          </button>
+        </div>
+
+        <!-- Resultados de la búsqueda -->
+        <div id="search-results-stream" class="flex flex-col gap-2 mt-2">
+          <!-- Se llena reactivamente -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== BARRA DE NAVEGACIÓN INFERIOR (MÓVIL) ==================== -->
+  <footer class="fixed bottom-0 left-0 right-0 z-50 bg-surface/95 backdrop-blur border-t border-surface-border md:hidden px-2 py-1.5">
+    <div class="grid grid-cols-3 gap-1">
+      <button id="mobile-nav-console" onclick="switchTab('console')" class="flex flex-col items-center justify-center py-1 text-primary">
+        <span class="material-symbols-outlined text-[22px]">timer</span>
+        <span class="text-[10px] font-mono font-bold">Consola</span>
+      </button>
+
+      <button id="mobile-nav-timeline" onclick="switchTab('timeline')" class="flex flex-col items-center justify-center py-1 text-on-surface-variant">
+        <span class="material-symbols-outlined text-[22px]">receipt_long</span>
+        <span class="text-[10px] font-mono font-semibold">Bitácora</span>
+      </button>
+
+      <button id="mobile-nav-drugs" onclick="switchTab('drugs')" class="flex flex-col items-center justify-center py-1 text-on-surface-variant">
+        <span class="material-symbols-outlined text-[22px]">medication</span>
+        <span class="text-[10px] font-mono font-semibold">Dosis</span>
+      </button>
+    </div>
+  </footer>
+
+  <!-- Carga del Script Principal -->
+  <script src="app.js"></script>
+</body>
+</html>
