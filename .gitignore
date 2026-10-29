@@ -32,3 +32,6 @@ desktop.ini
 !.vscode/extensions.json
 *.suo
 *.user
+
+# Local development server
+server.ps1
