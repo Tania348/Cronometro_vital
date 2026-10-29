@@ -4,7 +4,6 @@
 **Versión:** 1.0.0 (Primera versión web pública)  
 **Fecha:** 29 de octubre de 2026  
 **Enlace Público:** [https://tania348.github.io/Cronometro_vital/](https://tania348.github.io/Cronometro_vital/)  
-**Equipo:** Ana Yolanda Moreno, Tania Jineth Gomez, Juliana Maria Suancha, Andrés Felipe Moreno, María Fernanda Martinez.
 
 ---
 
@@ -40,4 +39,4 @@ Formato estricto: **«Al tocar X, pasa Y, y esperaba Z»**
 2. **Paso 2 (Prioridad Alta):** Añadir opción de "Deshacer último evento" durante 4 segundos para evitar registros erróneos en situaciones de alta adrenalina.
 3. **Paso 3 (Prioridad Media):** Implementar vibración silenciosa en teléfonos compatibles al llegar a los 2 minutos de RCP y al entrar en ventana de Adrenalina (3-5 min).
 4. **Paso 4 (Prioridad Media):** Añadir botón de "Exportar a PDF" o imprimir resumen clínico con un solo clic para adjuntar a la historia clínica en físico.
-5. **Paso 5 (Validación de Equipo):** Compartir el enlace con Andrés Felipe Moreno (Pruebas) y Juliana María Suancha (Producto) para sesión de validación clínica.
+5. **Paso 5 (Validación Clínica):** Realizar sesiones de simulación con el equipo de reanimación y profesionales de salud para retroalimentación operativa.

@@ -596,7 +596,7 @@ function copyAuditLog() {
   
   let reportText = `========================================\n`;
   reportText += `REPORTE CLÍNICO DE CÓDIGO AZUL (ACLS)\n`;
-  reportText += `Cronómetro Vital • Hospital / Urgencias\n`;
+  reportText += `Cronómetro Vital • Asistente de Reanimación ACLS\n`;
   reportText += `Fecha / Hora Inicio: ${state.startTime ? state.startTime.toLocaleString() : 'N/A'}\n`;
   reportText += `Duración Total del Paro: ${formatTime(state.masterSeconds)}\n`;
   reportText += `Ciclos de RCP Realizados: ${state.cyclesCompleted}\n`;

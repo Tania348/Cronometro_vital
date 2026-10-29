@@ -4,14 +4,6 @@ Asistente inteligente de tiempos e intervenciones para el rol de cronometrista e
 
 ---
 
-## 👥 Equipo de Trabajo
-- **Construye:** Ana Yolanda Moreno y Tania Jineth Gomez
-- **Producto:** Juliana Maria Suancha
-- **Pruebas:** Andrés Felipe Moreno
-- **Publica:** María Fernanda Martinez
-
----
-
 ## 🎯 Funciones Principales
 
 1. **Anotar (Registrar evento):** Botones de acción rápida táctiles extragrandes (`Adrenalina 1mg`, `Desfibrilación / Shock 200J`, `Amiodarona 300mg / 150mg`, `Ritmos`, `Vía Aérea`, `Acceso Vascular`) que capturan automáticamente el minuto y segundo exactos sin necesidad de teclear.
@@ -33,7 +25,7 @@ Asistente inteligente de tiempos e intervenciones para el rol de cronometrista e
 
 ## 🛡️ Principios del PRD
 - **100% Silenciosa:** Sin pitidos ni alarmas audibles que compitan con el desfibrilador o confundan al equipo en sala de reanimación. Todo aviso es visual.
-- **Sin formularios de paciente:** Cero fricción de datos demográficos durante la crisis.
+- **Sin datos de paciente:** Cero formularios de identificación o datos demográficos para garantizar privacidad y latencia cero durante la crisis.
 - **Sin cálculos de dosis:** Registra fielmente lo administrado sin sustituir el criterio médico.
 - **Independiente:** Funciona en cualquier navegador de celular o computador sin requerir conexión a monitores clínicos.
 
