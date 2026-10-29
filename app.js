@@ -33,10 +33,12 @@ const state = {
 
 // Referencias del temporizador
 let masterInterval = null;
+let lastTimestamp = Date.now();
 
 // Inicialización de la aplicación
 window.addEventListener('DOMContentLoaded', () => {
   state.startTime = new Date();
+  lastTimestamp = Date.now();
   const timeStr = state.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const timeStartedEl = document.getElementById('time-started');
   if (timeStartedEl) timeStartedEl.textContent = timeStr;
@@ -57,28 +59,54 @@ window.addEventListener('DOMContentLoaded', () => {
   renderUI();
 });
 
-// Inicia el loop del temporizador
+// Sincronización al regresar a la pestaña en el celular
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && state.isRunning) {
+    const now = Date.now();
+    const deltaMs = now - lastTimestamp;
+    if (deltaMs >= 1000) {
+      const deltaSec = Math.floor(deltaMs / 1000);
+      lastTimestamp += deltaSec * 1000;
+      state.masterSeconds += deltaSec;
+      if (state.cycleRemainingSeconds > 0) {
+        state.cycleRemainingSeconds = Math.max(0, state.cycleRemainingSeconds - deltaSec);
+      }
+      renderTimers();
+      renderUI();
+    }
+  }
+});
+
+// Inicia el loop del temporizador con sincronización horaria real
 function startTimer() {
   if (masterInterval) clearInterval(masterInterval);
   state.isRunning = true;
+  lastTimestamp = Date.now();
   updateTimerControlsUI();
 
   masterInterval = setInterval(() => {
-    if (!state.isRunning) return;
-
-    // Incrementar reloj maestro
-    state.masterSeconds++;
-
-    // Decrementar ciclo de 2 min
-    if (state.cycleRemainingSeconds > 0) {
-      state.cycleRemainingSeconds--;
-    } else {
-      // Si llegó a cero y no se ha marcado, se mantiene en 0 para exigir la marca
-      // o cuenta en negativo como tiempo vencido
+    if (!state.isRunning) {
+      lastTimestamp = Date.now();
+      return;
     }
 
-    renderTimers();
-  }, 1000);
+    const now = Date.now();
+    const deltaMs = now - lastTimestamp;
+    if (deltaMs >= 1000) {
+      const deltaSec = Math.floor(deltaMs / 1000);
+      lastTimestamp += deltaSec * 1000;
+
+      // Incrementar reloj maestro
+      state.masterSeconds += deltaSec;
+
+      // Decrementar ciclo de 2 min
+      if (state.cycleRemainingSeconds > 0) {
+        state.cycleRemainingSeconds = Math.max(0, state.cycleRemainingSeconds - deltaSec);
+      }
+
+      renderTimers();
+    }
+  }, 250);
 }
 
 // Alternar entre Pausa y Reanudar
